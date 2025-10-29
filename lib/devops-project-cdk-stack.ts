@@ -10,15 +10,18 @@ export class DevopsProjectCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    // Get configuration from cdk.json context
     const vpcCidr = this.node.tryGetContext('vpcCidr') || '10.20.0.0/16';
     const instanceType = this.node.tryGetContext('instanceType') || 't3.micro';
     const desiredCapacity = this.node.tryGetContext('desiredCapacity') || 2;
     const minCapacity = this.node.tryGetContext('minCapacity') || 1;
     const maxCapacity = this.node.tryGetContext('maxCapacity') || 4;
     const dbStorage = this.node.tryGetContext('dbStorage') || 20;
-    const dbInstanceType = this.node.tryGetContext('dbInstanceType') || 'db.t3.micro';
+    const dbInstanceClass = this.node.tryGetContext('dbInstanceClass') || 'BURSTABLE3';
+    const dbInstanceSize = this.node.tryGetContext('dbInstanceSize') || 'MICRO';
     const maxAzs = this.node.tryGetContext('maxAzs') || 2;
 
+    // Create VPC
     const vpc = new ec2.Vpc(this, 'AppVPC', {
       ipAddresses: ec2.IpAddresses.cidr(vpcCidr),
       maxAzs: maxAzs,
@@ -43,6 +46,7 @@ export class DevopsProjectCdkStack extends cdk.Stack {
       exportName: 'VpcId',
     });
 
+    // Security Group for ALB
     const albSecurityGroup = new ec2.SecurityGroup(this, 'ALBSecurityGroup', {
       vpc,
       description: 'Security group for Application Load Balancer',
@@ -61,6 +65,7 @@ export class DevopsProjectCdkStack extends cdk.Stack {
       'Allow HTTPS traffic from anywhere'
     );
 
+    // Security Group for EC2
     const ec2SecurityGroup = new ec2.SecurityGroup(this, 'EC2SecurityGroup', {
       vpc,
       description: 'Security group for EC2 instances',
@@ -73,6 +78,7 @@ export class DevopsProjectCdkStack extends cdk.Stack {
       'Allow HTTP traffic from ALB'
     );
 
+    // Security Group for RDS
     const dbSecurityGroup = new ec2.SecurityGroup(this, 'DBSecurityGroup', {
       vpc,
       description: 'Security group for RDS database',
@@ -85,6 +91,7 @@ export class DevopsProjectCdkStack extends cdk.Stack {
       'Allow PostgreSQL traffic from EC2 instances'
     );
 
+    // Application Load Balancer
     const alb = new elbv2.ApplicationLoadBalancer(this, 'ApplicationLB', {
       vpc,
       internetFacing: true,
@@ -100,6 +107,7 @@ export class DevopsProjectCdkStack extends cdk.Stack {
       exportName: 'LoadBalancerDNS',
     });
 
+    // Target Group
     const targetGroup = new elbv2.ApplicationTargetGroup(this, 'EC2TargetGroup', {
       vpc,
       port: 80,
@@ -115,12 +123,14 @@ export class DevopsProjectCdkStack extends cdk.Stack {
       },
     });
 
+    // ALB Listener
     alb.addListener('HTTPListener', {
       port: 80,
       protocol: elbv2.ApplicationProtocol.HTTP,
       defaultTargetGroups: [targetGroup],
     });
 
+    // User Data for EC2
     const userData = ec2.UserData.forLinux();
     userData.addCommands(
       '#!/bin/bash',
@@ -132,6 +142,7 @@ export class DevopsProjectCdkStack extends cdk.Stack {
       'echo "OK" > /var/www/html/health'
     );
 
+    // Auto Scaling Group
     const asg = new autoscaling.AutoScalingGroup(this, 'EC2AutoScalingGroup', {
       vpc,
       instanceType: new ec2.InstanceType(instanceType),
@@ -152,6 +163,7 @@ export class DevopsProjectCdkStack extends cdk.Stack {
       targetUtilizationPercent: 50,
     });
 
+    // Database Credentials Secret
     const dbCredentials = new secretsmanager.Secret(this, 'DBCredentials', {
       secretName: 'rds-db-credentials',
       generateSecretString: {
@@ -163,35 +175,15 @@ export class DevopsProjectCdkStack extends cdk.Stack {
       },
     });
 
-    const database = new rds.DatabaseInstance(this, 'PostgresDatabase', {
-      engine: rds.DatabaseInstanceEngine.postgres({
-        version: rds.PostgresEngineVersion.VER_15_4,
-      }),
-      instanceType: new ec2.InstanceType(dbInstanceType),
-      vpc,
-      vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-      },
-      securityGroups: [dbSecurityGroup],
-      credentials: rds.Credentials.fromSecret(dbCredentials),
-      allocatedStorage: dbStorage,
-      storageType: rds.StorageType.GP2,
-      multiAz: false,
-      databaseName: 'appdb',
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      deletionProtection: false,
-    });
-
-    new cdk.CfnOutput(this, 'DatabaseEndpoint', {
-      value: database.dbInstanceEndpointAddress,
-      description: 'Database endpoint address',
-      exportName: 'DatabaseEndpoint',
-    });
-
-    new cdk.CfnOutput(this, 'DatabaseSecretArn', {
-      value: dbCredentials.secretArn,
-      description: 'ARN of database credentials secret',
-      exportName: 'DatabaseSecretArn',
-    });
-  }
-}
+    // Helper function to map instance size string to enum
+    const getInstanceSize = (size: string): rds.InstanceSize => {
+      switch (size.toUpperCase()) {
+        case 'MICRO': return rds.InstanceSize.MICRO;
+        case 'SMALL': return rds.InstanceSize.SMALL;
+        case 'MEDIUM': return rds.InstanceSize.MEDIUM;
+        case 'LARGE': return rds.InstanceSize.LARGE;
+        case 'XLARGE': return rds.InstanceSize.XLARGE;
+        case 'XLARGE2': return rds.InstanceSize.XLARGE2;
+        case 'XLARGE4': return rds.InstanceSize.XLARGE4;
+        case 'XLARGE8': return rds.InstanceSize.XLARGE8;
+        default: return rds.InstanceSize
