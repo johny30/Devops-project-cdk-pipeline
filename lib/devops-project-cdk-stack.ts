@@ -186,4 +186,55 @@ export class DevopsProjectCdkStack extends cdk.Stack {
         case 'XLARGE2': return rds.InstanceSize.XLARGE2;
         case 'XLARGE4': return rds.InstanceSize.XLARGE4;
         case 'XLARGE8': return rds.InstanceSize.XLARGE8;
-        default: return rds.InstanceSize
+        default: return rds.InstanceSize.MICRO;
+      }
+    };
+
+    // Helper function to map instance class string to enum
+    const getInstanceClass = (instanceClass: string): rds.InstanceClass => {
+      switch (instanceClass.toUpperCase()) {
+        case 'BURSTABLE3': return rds.InstanceClass.BURSTABLE3;
+        case 'BURSTABLE4': return rds.InstanceClass.BURSTABLE4;
+        case 'MEMORY5': return rds.InstanceClass.MEMORY5;
+        case 'MEMORY6': return rds.InstanceClass.MEMORY6;
+        case 'COMPUTE5': return rds.InstanceClass.COMPUTE5;
+        default: return rds.InstanceClass.BURSTABLE3;
+      }
+    };
+
+    // RDS Database Instance
+    const database = new rds.DatabaseInstance(this, 'PostgresDatabase', {
+      engine: rds.DatabaseInstanceEngine.postgres({
+        version: rds.PostgresEngineVersion.VER_15_4,
+      }),
+      instanceType: rds.InstanceType.of(
+        getInstanceClass(dbInstanceClass),
+        getInstanceSize(dbInstanceSize)
+      ),
+      vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+      },
+      securityGroups: [dbSecurityGroup],
+      credentials: rds.Credentials.fromSecret(dbCredentials),
+      allocatedStorage: dbStorage,
+      storageType: rds.StorageType.GP2,
+      multiAz: false,
+      databaseName: 'appdb',
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      deletionProtection: false,
+    });
+
+    new cdk.CfnOutput(this, 'DatabaseEndpoint', {
+      value: database.dbInstanceEndpointAddress,
+      description: 'Database endpoint address',
+      exportName: 'DatabaseEndpoint',
+    });
+
+    new cdk.CfnOutput(this, 'DatabaseSecretArn', {
+      value: dbCredentials.secretArn,
+      description: 'ARN of database credentials secret',
+      exportName: 'DatabaseSecretArn',
+    });
+  }
+}
