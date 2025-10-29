@@ -17,8 +17,7 @@ export class DevopsProjectCdkStack extends cdk.Stack {
     const minCapacity = this.node.tryGetContext('minCapacity') || 1;
     const maxCapacity = this.node.tryGetContext('maxCapacity') || 4;
     const dbStorage = this.node.tryGetContext('dbStorage') || 20;
-    const dbInstanceClass = this.node.tryGetContext('dbInstanceClass') || 'BURSTABLE3';
-    const dbInstanceSize = this.node.tryGetContext('dbInstanceSize') || 'MICRO';
+    const dbInstanceType = this.node.tryGetContext('dbInstanceType') || 't3.micro';
     const maxAzs = this.node.tryGetContext('maxAzs') || 2;
 
     // Create VPC
@@ -163,7 +162,7 @@ export class DevopsProjectCdkStack extends cdk.Stack {
       targetUtilizationPercent: 50,
     });
 
-        // Database Credentials Secret
+    // Database Credentials Secret
     const dbCredentials = new secretsmanager.Secret(this, 'DBCredentials', {
       secretName: 'rds-db-credentials',
       generateSecretString: {
@@ -178,9 +177,9 @@ export class DevopsProjectCdkStack extends cdk.Stack {
     // RDS Database Instance
     const database = new rds.DatabaseInstance(this, 'PostgresDatabase', {
       engine: rds.DatabaseInstanceEngine.postgres({
-        version: rds.PostgresEngineVersion.VER_15_4,
+        version: rds.PostgresEngineVersion.VER_15,
       }),
-      instanceType: new ec2.InstanceType('t3.micro'),
+      instanceType: new ec2.InstanceType(dbInstanceType),
       vpc,
       vpcSubnets: {
         subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
