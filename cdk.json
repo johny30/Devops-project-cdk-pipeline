@@ -61,7 +61,8 @@
     "maxCapacity": 4,
     "dbEngine": "postgres",
     "dbStorage": 20,
-    "dbInstanceType": "db.t3.micro",
+    "dbInstanceClass": "BURSTABLE3",
+    "dbInstanceSize": "MICRO",
     "enableMultiAz": false,
     "maxAzs": 2
   }

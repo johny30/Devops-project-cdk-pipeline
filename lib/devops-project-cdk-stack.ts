@@ -163,7 +163,7 @@ export class DevopsProjectCdkStack extends cdk.Stack {
       targetUtilizationPercent: 50,
     });
 
-    // Database Credentials Secret
+        // Database Credentials Secret
     const dbCredentials = new secretsmanager.Secret(this, 'DBCredentials', {
       secretName: 'rds-db-credentials',
       generateSecretString: {
@@ -175,42 +175,12 @@ export class DevopsProjectCdkStack extends cdk.Stack {
       },
     });
 
-    // Helper function to map instance size string to enum
-    const getInstanceSize = (size: string): rds.InstanceSize => {
-      switch (size.toUpperCase()) {
-        case 'MICRO': return rds.InstanceSize.MICRO;
-        case 'SMALL': return rds.InstanceSize.SMALL;
-        case 'MEDIUM': return rds.InstanceSize.MEDIUM;
-        case 'LARGE': return rds.InstanceSize.LARGE;
-        case 'XLARGE': return rds.InstanceSize.XLARGE;
-        case 'XLARGE2': return rds.InstanceSize.XLARGE2;
-        case 'XLARGE4': return rds.InstanceSize.XLARGE4;
-        case 'XLARGE8': return rds.InstanceSize.XLARGE8;
-        default: return rds.InstanceSize.MICRO;
-      }
-    };
-
-    // Helper function to map instance class string to enum
-    const getInstanceClass = (instanceClass: string): rds.InstanceClass => {
-      switch (instanceClass.toUpperCase()) {
-        case 'BURSTABLE3': return rds.InstanceClass.BURSTABLE3;
-        case 'BURSTABLE4': return rds.InstanceClass.BURSTABLE4;
-        case 'MEMORY5': return rds.InstanceClass.MEMORY5;
-        case 'MEMORY6': return rds.InstanceClass.MEMORY6;
-        case 'COMPUTE5': return rds.InstanceClass.COMPUTE5;
-        default: return rds.InstanceClass.BURSTABLE3;
-      }
-    };
-
     // RDS Database Instance
     const database = new rds.DatabaseInstance(this, 'PostgresDatabase', {
       engine: rds.DatabaseInstanceEngine.postgres({
         version: rds.PostgresEngineVersion.VER_15_4,
       }),
-      instanceType: rds.InstanceType.of(
-        getInstanceClass(dbInstanceClass),
-        getInstanceSize(dbInstanceSize)
-      ),
+      instanceType: new ec2.InstanceType('t3.micro'),
       vpc,
       vpcSubnets: {
         subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
